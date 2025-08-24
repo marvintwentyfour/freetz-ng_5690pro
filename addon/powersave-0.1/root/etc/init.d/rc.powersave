@@ -1,0 +1,189 @@
+#!/bin/bash
+
+
+CPUFREQ=/sys/devices/system/cpu/cpufreq/policy0
+
+ADVERTISE=0x028
+TIMER=70
+#EEE_PORTS="eth0 eth1 eth2 eth3 wan"
+EEE_EN="eee on tx-lpi on advertise $ADVERTISE tx-timer $TIMER"
+
+L1s=1
+L2=2
+let L1sL2=$L1s\|$L2
+#PCIE_PORTS="0001:00:00.0=$L1sL2 0002:00:00.0=$L1sL2 0003:00:00.0=$L1sL2 0001:01:00.0=$L1sL2 0002:01:00.0=$L2 0003:01:00.0=$L1sL2"
+PCIE_POL=/sys/module/pcie_aspm/parameters/policy
+SETPCI=/usr/bin/setpci
+POLICY="powersave"
+DAEMON="powersave"
+
+. /mod/etc/default.$DAEMON/$DAEMON.cfg
+. /etc/init.d/modlibrc
+[ -r /etc/options.cfg ] && . /etc/options.cfg
+
+. /etc/init.d/enable_aspm
+
+# Change cpu scaling governor to ondemand
+# ToDo:
+# - make governor selectable via web-if
+set_governor() {
+    echo -n "current scaling governor: "
+    cat "$CPUFREQ/scaling_governor"
+    echo "setting governor to $POWERSAVE_GOVERNOR"
+    echo $POWERSAVE_GOVERNOR > $CPUFREQ/scaling_governor
+}
+
+# enable Energy Efficient Ethernet on all eth* ports
+# ToDo:
+# - auto-detect the supported speeds of both endpoints
+# - make stuff adjustable via web-if
+enable_eee() {
+    if [ -n "$POWERSAVE_EEE_PORTS" ]; then
+      echo -n "enabling energy efficient ethernet on "
+      for i in $POWERSAVE_EEE_PORTS; do
+	  ip link show $i >/dev/null 2>&1 && \
+    	    ethtool --set-eee $i $EEE_EN >/dev/null 2>&1  && echo -n "$i, "
+      done
+      echo "done"
+    fi
+}
+
+disable_eee() {
+    if [ -n "$POWERSAVE_EEE_PORTS" ]; then
+      echo -n "disabling energy efficient ethernet on "
+      for i in $POWERSAVE_EEE_PORTS; do
+	  ip link show $i >/dev/null 2>&1 && \
+    	    ethtool --set-eee $i eee off 2>&1  && echo -n "$i, "
+      done
+      echo "done"
+    fi
+}
+
+# enable ASPM on PCI devices which support it
+# This doesn't seem to work well, < 100 mW if anything
+enable_aspm() {
+    if [ -x $SETPCI ]; then
+	echo "enabling ASPM on PCI devices "
+
+	for i in $POWERSAVE_ASPM_DEVS; do
+	    port=${i%%=*}
+	    mode=${i##*=}
+	    echo "setting device $port to $mode"
+#        setpci -s $i 0x80.B=0x03:3
+	    enable_aspm_byte $port $mode
+#	sleep 1
+        done
+	echo $POLICY > $PCIE_POL
+        echo "done"
+    fi
+}
+
+disable_aspm() {
+    if [ -x $SETPCI ]; then
+	echo "reset ASPM on PCI devices "
+
+	for i in $POWERSAVE_ASPM_DEVS; do
+	    port=${i%%=*}
+	    mode=${i##*=}
+	    echo "setting device $port to $mode"
+#        setpci -s $i 0x80.B=0x03:3
+	    enable_aspm_byte $port 0
+#	sleep 1
+        done
+	echo default > $PCIE_POL
+        echo "done"
+    fi
+}
+
+disable_fiber() {
+    local gpio=$(gpiofind rtl-power-on)
+    local state=$(gpioget $gpio)
+    if [ $state == 1 ]; then
+        echo "Unpowering fibermodem"
+	# Assert (set gpio to 0) fibermodem in order to remove power from companion SoC
+	/usr/libexec/msoc/HW280/reset-assert
+    else
+	echo "Fiber modem already unpowered"
+    fi
+}
+
+enable_fiber() {
+    local gpio=$(gpiofind rtl-power-on)
+    local state=$(gpioget $gpio)
+    if [ $state == 0 ]; then
+        echo "Power-on fibermodem"
+         # Deassert (set gpio to 1) fibermodem in order to power-on the companion SoC
+        /usr/libexec/msoc/HW280/reset-deassert
+        echo "send firmware"
+        /usr/libexec/msoc/HW280/send-firmware &
+        sleep 10
+        killall send-firmware
+    else
+	echo "Fiber modem already powered"
+    fi
+}
+
+start() {
+	    if [ "$POWERSAVE_GOVERNOR_ENABLED" == "yes" ]; then
+		set_governor
+	    else
+		POWERSAVE_GOVERNOR="performance" set_governor  # default
+	    fi
+
+	    if [ "$POWERSAVE_EEE_ENABLED" == "yes" ]; then
+		enable_eee
+	    else
+		disable_eee
+	    fi
+
+	    if [ "$POWERSAVE_ASPM_ENABLED" == "yes" ]; then
+		enable_aspm
+	    else
+		disable_aspm
+	    fi
+
+	    if [ "$POWERSAVE_FIBER_DISABLED" == "yes" ]; then
+		disable_fiber
+	    else
+		enable_fiber
+	    fi
+}
+
+stop() {
+	    POWERSAVE_GOVERNOR="performance" set_governor  # default
+	    disable_eee
+	    disable_aspm
+	    enable_fiber
+}
+
+case $1 in
+    unload)
+	    modunreg cgi $DAEMON
+	    ;;
+    ""|load)
+	    modreg cgi $DAEMON "Powersave"
+	    if [ "$POWERSAVE_ENABLED" != "yes" ]; then
+		echo "$DAEMON is disabled" 1>&2
+		exit 1
+	    fi
+	    start
+	    ;;
+    start)
+	    start
+	    ;;
+    stop)
+	    stop
+	    ;;
+    restart)
+	    modlib_restart
+	    ;;
+    status)
+	    modlib_status
+	    ;;
+    *)
+	    echo "Usage $0 [load|unload|start|stop|restart|status]" 2>&1
+	    exit 1
+	    ;;
+esac
+
+exit 0

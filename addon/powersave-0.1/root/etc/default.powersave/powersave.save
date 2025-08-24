@@ -1,0 +1,11 @@
+# this function is executed in order to apply changes
+pkg_post_save() {
+	# apply changes
+	/mod/etc/init.d/rc.powersave start
+}
+
+# this function is executed in order to apply defaults
+pkg_post_def() {
+	# reset to defaults
+	/mod/etc/init.d/rc.powersave stop
+}

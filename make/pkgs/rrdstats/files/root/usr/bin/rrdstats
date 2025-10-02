@@ -124,7 +124,13 @@ collect_temp() {
 			RRA:MAX:0.1:360:2920
 	fi
 	uT="$(ctlmgr_ctl r power status/act_temperature 2>/dev/null)"
-	[ $uT -gt 0 ] 2>/dev/null || return
+	if [ $uT -eq 0 ]; then
+		# in case ctlmgr_ctl does not provide accurate data try access sysfs directly
+		if [[ -n $RRDSTATS_TEMP_SRC ]]; then
+			uT=$(echo "scale=1; `cat /sys/class/hwmon/$RRDSTATS_TEMP_SRC`/1000" | bc -l)
+		fi
+		[ "x$uT" == "x0"  ] && return
+	fi
 	tempdata=N:$uT
 	$_NICE $RRDTOOL update $RRDSTATS_RRDDATA/$NAMEPREFIX.rrd $tempdata --template temperature
 }

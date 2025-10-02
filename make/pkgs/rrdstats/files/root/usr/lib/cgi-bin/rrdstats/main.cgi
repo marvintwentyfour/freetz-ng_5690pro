@@ -256,7 +256,7 @@ generate_graph() {
 				                                                                    \
 				DEF:temperature=$FILE:temperature:MAX                               \
 				                                                                    \
-				AREA:temperature$RED:"Temperature\t\t"                              \
+				LINE3:temperature$RED:"$(len15 Temperature)\t"                      \
 				GPRINT:temperature:MIN:"%3.0lf\t"                                   \
 				GPRINT:temperature:AVERAGE:"%3.0lf\t"                               \
 				GPRINT:temperature:MAX:"%3.0lf\t"                                   \

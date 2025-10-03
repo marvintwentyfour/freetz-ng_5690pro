@@ -99,5 +99,12 @@ if FREETZ_PACKAGE_RRDSTATS
 			current and temperature.
 			This enables the options in the Webif.
 
-endif # FREETZ_PACKAGE_RRDSTATS
+	config FREETZ_PACKAGE_RRDSTATS_POWERCONSUMPTION
+		bool "Support for box power consumption"
+		depends on FREETZ_TYPE_5690_PRO
+		default n
+		help
+			Enables support for the box internal
+			power measurement IC.
 
+endif # FREETZ_PACKAGE_RRDSTATS

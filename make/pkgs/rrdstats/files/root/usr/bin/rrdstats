@@ -111,6 +111,27 @@ collect_pow() {
 	$_NICE $RRDTOOL update $RRDSTATS_RRDDATA/$NAMEPREFIX.rrd N${powdat} --template ${powtpl:1}
 }
 
+collect_pow2() {
+	NAMEPREFIX=pow2_$RRDSTATS_INTERVAL
+	if [ ! -e $RRDSTATS_RRDDATA/$NAMEPREFIX.rrd ]; then
+		for sourceitem in $RRDSTATS_POWER2_CFG; do
+			local datasources="$datasources DS:$sourceitem:GAUGE:600:0:100"
+		done
+		$RRDTOOL create $RRDSTATS_RRDDATA/$NAMEPREFIX.rrd \
+			--step $RRDSTATS_INTERVAL \
+			$datasources \
+			RRA:AVERAGE:0.1:1:3600 \
+			RRA:AVERAGE:0.1:10:360 \
+			RRA:MIN:0.1:360:10 \
+			RRA:MAX:0.1:360:10
+	fi
+	for sourceitem in $RRDSTATS_POWER2_CFG; do
+		local powdat=$powdat:$(echo "scale=3; `cat /sys/class/hwmon/hwmon0/power1_input`/1000000" | bc -l)
+		local powtpl="$powtpl:${sourceitem}"
+	done
+	$_NICE $RRDTOOL update $RRDSTATS_RRDDATA/$NAMEPREFIX.rrd N${powdat} --template ${powtpl:1}
+}
+
 collect_temp() {
 	NAMEPREFIX=temp_$RRDSTATS_INTERVAL
 	if [ ! -e $RRDSTATS_RRDDATA/$NAMEPREFIX.rrd ]; then
@@ -716,6 +737,9 @@ while true; do
 	collect_mem
 	[ "$RRDSTATS_UPTIME_ENB" = yes ] && collect_upt
 	[ "$RRDSTATS_POWER_ENB" = yes ] && collect_pow
+	if [ "$FREETZ_PACKAGE_RRDSTATS_POWERCONSUMPTION" == "y" ]; then
+		[ "$RRDSTATS_POWER2_ENB" = yes ] && collect_pow2
+	fi
 	if [ "$FREETZ_PACKAGE_RRDSTATS_TEMPERATURE_SENSOR" == "y" ]; then
 		[ "$RRDSTATS_TEMP_ENB" = yes ] && collect_temp
 	fi

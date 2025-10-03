@@ -28,6 +28,7 @@ check "$RRDSTATS_DARKMODE" yes:darkmode
 check "$RRDSTATS_CPU100PERC" yes:cpu100perc
 check "$RRDSTATS_UPTIME_ENB" yes:uptime_enb
 check "$RRDSTATS_POWER_ENB" yes:power_enb
+check "$RRDSTATS_POWER2_ENB" yes:power2_enb
 check "$RRDSTATS_TEMP_ENB" yes:temp_enb
 check "$RRDSTATS_WEBENABLED" yes:webenabled
 check "$RRDSTATS_WEB_INETD"  yes:web_inetd
@@ -167,8 +168,16 @@ cat << EOF
 <p>
 <input type="hidden" name="power_enb" value="no">
 <input id="u2" type="checkbox" name="power_enb" value="yes"$power_enb_chk>
-<label for="u2">$(lang de:"Energieverbrauch aufzeichnen und anzeigen" en:"Power Consumption logging and graphs")</label></p>
+<label for="u2">$(lang de:"Komponentenauslastung aufzeichnen und anzeigen" en:"Components load logging and graphs")</label></p>
 EOF
+if [ "$FREETZ_PACKAGE_RRDSTATS_POWERCONSUMPTION" == "y" ]; then
+cat << EOF
+<p>
+<input type="hidden" name="power2_enb" value="no">
+<input id="p1" type="checkbox" name="power2_enb" value="yes"$power2_enb_chk>
+<label for="p1">$(lang de:"Leistungsaufnahme aufzeichnen und anzeigen" en:"Power Consumption logging and graphs")</label></p>
+EOF
+fi
 if [ "$RRDSTATS_POWER_ENB" == "yes" ]; then
 cat << EOF
 <p>$(lang de:"Diese Verbraucher &uuml;berwachen" en:"Observe these consumers"):&nbsp;<input type="text" name="power_cfg" size="45" maxlength="255" value="$(html "$RRDSTATS_POWER_CFG")">
@@ -177,7 +186,6 @@ for x in $(ctlmgr_ctl -v u power 2>/dev/null | sed -rn 's/.*rate_(.*)act=.*/\1/p
 [ -n "$PIT" ] && echo "<br /><font size='-2'>$(lang de:"Verf&uuml;gbar" en:"Available"): $PIT</font>"
 echo "</p>"
 fi
-
 
 if [ "$FREETZ_PACKAGE_RRDSTATS_TEMPERATURE_SENSOR" == "y" ]; then
 cat << EOF

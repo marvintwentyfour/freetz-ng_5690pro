@@ -3,6 +3,7 @@
 # initially by ramik, extended by cuma
 
 
+. /usr/lib/libmodcgi.sh
 . /mod/etc/conf/rrdstats.cfg
 [ -r /etc/options.cfg ] && . /etc/options.cfg
 
@@ -235,6 +236,36 @@ generate_graph() {
 				$DEFAULT_COLORS                                           \
 				-W "Generated on: $DATESTRING"                            \
 				COMMENT:"$(mamc "Prozent")"                               \
+				$DSDEFS                                                   \
+				$LINE3S                                                   \
+				                                                          > /dev/null
+			fi
+			;;
+		pow2)
+			FILE=$RRDSTATS_RRDDATA/pow2_$RRDSTATS_INTERVAL.rrd
+			if [ -e $FILE ]; then
+				for sourceitem in $RRDSTATS_POWER2_CFG; do
+					case $sourceitem in
+						hwmon0)		DCOL=$PURPLE   ; DNAME="Total system"    ;;
+						*)		DCOL=$BLACK    ; DNAME="$sourceitem"     ;;
+					esac
+					local DSDEFS="$DSDEFS DEF:$sourceitem=$FILE:$sourceitem:MAX"
+					local LINE3S="$LINE3S LINE3:$sourceitem$DCOL:$(len15 $DNAME)\t \
+					GPRINT:$sourceitem:MIN:%3.3lf%s\t \
+					GPRINT:$sourceitem:AVERAGE:%3.3lf%s\t \
+					GPRINT:$sourceitem:MAX:%3.3lf%s\t \
+					GPRINT:$sourceitem:LAST:%3.3lf%s\n \
+					"
+				done
+				$_NICE $RRDTOOL graph $GRAPHARGS                          \
+				$RRDSTATS_RRDTEMP/$IMAGENAME.$IMAGETYPE                   \
+				--title "$TITLE"                                          \
+				--start -1-$PERIODE -l 0 -u 20 -r                         \
+				--width $WIDTH --height $HEIGHT $LAZY                     \
+				--vertical-label "Power consumption [W]" -X 1             \
+				$DEFAULT_COLORS                                           \
+				-W "Generated on: $DATESTRING"                            \
+				COMMENT:"$(mamc "Watts")"                                 \
 				$DSDEFS                                                   \
 				$LINE3S                                                   \
 				                                                          > /dev/null
@@ -1325,7 +1356,7 @@ graphit() {
 	graph=$1
 	#graph=$(cgi_param graph | tr -d .)
 	case $graph in
-		cpu|mem|swap|upt|pow|temp|thg0|thg1|thg2|thg3|epc0|epcA|epcB|epcC|epc1|epc2|arris0|arris1|arris2|arris3|dvb|csl0|csl1|csl2|diskio1|diskio2|diskio3|diskio4|if1|if2|if3|if4|one|aha*)
+		cpu|mem|swap|upt|pow|pow2|temp|thg0|thg1|thg2|thg3|epc0|epcA|epcB|epcC|epc1|epc2|arris0|arris1|arris2|arris3|dvb|csl0|csl1|csl2|diskio1|diskio2|diskio3|diskio4|if1|if2|if3|if4|one|aha*)
 			set_lazy "$RRDSTATS_NOTLAZYS"
 			#GROUP_PERIOD=$(cgi_param group | tr -d .)
 			if [ -z "$GROUP_PERIOD" ]; then
@@ -1517,6 +1548,9 @@ EOF
 					[ "$RRDSTATS_POWER_ENB" = yes ] && gen_main "pow" "Power" "$periodnn"
 					if [ "$FREETZ_PACKAGE_RRDSTATS_TEMPERATURE_SENSOR" == "y" ]; then
 						[ "$RRDSTATS_TEMP_ENB" = yes ] && gen_main "temp" "Temperature" "$periodnn"
+					fi
+					if [ "$FREETZ_PACKAGE_RRDSTATS_POWERCONSUMPTION" == "y" ]; then
+						[ "$RRDSTATS_POWER2_ENB" = yes ] && gen_main "pow2" "Power consumption" "$periodnn"
 					fi
 					if [ "$FREETZ_PACKAGE_RRDSTATS_CABLEMODEM" == "y" ]; then
 						[ "$RRDSTATS_CABLE_MODEM" = thg ] && gen_main "thg0" "Thomson THG" "$periodnn"

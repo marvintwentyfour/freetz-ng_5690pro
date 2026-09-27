@@ -18,6 +18,9 @@ $(PKG)_CONFIGURE_OPTIONS += --enable-static
 $(PKG)_CONFIGURE_OPTIONS += --enable-shared
 $(PKG)_CONFIGURE_OPTIONS += --with-readline=no
 
+# recreate configure because aclocal was patched
+$(PKG)_CONFIGURE_PRE_CMDS += autoconf --force;
+$(PKG)_CONFIGURE_PRE_CMDS += $(call PKG_UPDATE_CONFIGS,./)
 
 #$(PKG_SOURCE_DOWNLOAD)
 $(PKG_UNPACKED)
